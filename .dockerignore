@@ -1,0 +1,14 @@
+.gcloudignore
+.git
+.gitignore
+.venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.*
+.DS_Store
+.vscode/
+.idea/
+tests/
