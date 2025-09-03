@@ -1,0 +1,56 @@
+### Health check
+GET http://127.0.0.1:8000/health
+
+### List inquiries
+GET http://127.0.0.1:8000/inquiries
+
+### Create inquiry
+POST http://127.0.0.1:8000/inquiries
+Content-Type: application/json
+
+{
+  "source": "form",
+  "raw_subject": "Need quotation",
+  "raw_body": "500L acetone",
+  "from_email": "buyer@amitlabs.com",
+  "company_code": "ALAB"
+}
+
+### Create a new inquiry
+POST http://127.0.0.1:8000/inquiries
+Content-Type: application/json
+
+{
+  "company_code": "AMITLABS",
+  "description": "Need quotation for 500 units of chemical X"
+}
+
+### List all inquiries
+GET http://127.0.0.1:8000/inquiries
+
+### Create inquiry (works)
+POST http://127.0.0.1:8000/inquiries
+Content-Type: application/json
+
+{
+  "source": "form",
+  "raw_subject": "Need quotation",
+  "raw_body": "500L acetone",
+  "from_email": "buyer@amitlabs.com",
+  "company_code": "ALAB"
+}
+
+
+### Ingest (natural language → inquiry)
+POST http://127.0.0.1:8000/inquiries/ingest
+Content-Type: application/json
+
+{
+  "company_code": "ALAB",
+  "source": "email",
+  "from_email": "buyer@amitlabs.com",
+  "text": "Hi team, please quote 500 L acetone technical grade delivered Jaipur by Friday. Need MSDS and best price."
+}
+
+### List inquiries
+GET http://127.0.0.1:8000/inquiries?company_code=ALAB
