@@ -1,3 +1,8 @@
+@base = http://127.0.0.1:8000
+@company = ALAB
+@inquiry_id = 7635645d-5930-47fb-bcec-a74932fb1cd2
+@quotation_id = d38b88dc-3fda-4336-96e6-a9b2ab87502d
+
 ### Health check
 GET http://127.0.0.1:8000/health
 
@@ -54,3 +59,44 @@ Content-Type: application/json
 
 ### List inquiries
 GET http://127.0.0.1:8000/inquiries?company_code=ALAB
+
+
+### Ingest (runs parser → fills extraction_json)
+POST https://chakraos-api-656857229129.asia-south1.run.app/inquiries/ingest
+Content-Type: application/json
+
+{
+  "company_code": "ALAB",
+  "source": "email",
+  "from_email": "buyer@amitlabs.com",
+  "text": "Please quote 500 L benzene technical grade delivered Jaipur by Friday."
+}
+
+
+
+
+GET https://chakraos-api-656857229129.asia-south1.run.app/inquiries?company_code=ALAB
+
+### make a draft quotation directly
+POST http://127.0.0.1:8000/quotations
+Content-Type: application/json
+
+{
+  "company_code": "ALAB",
+  "currency": "INR",
+  "items": [
+    { "description": "Benzene 500 L Jaipur", "qty": 500, "uom": "L", "unit_price": 120.5 }
+  ]
+}
+
+### list quotations for ALAB
+GET {{base}}/quotations?company_code={{company}}
+
+### get a quotation
+GET {{base}}/quotations/{{quotation_id}}
+
+### turn an inquiry into a quotation
+POST {{base}}/inquiries/{{inquiry_id}}/to-quotation
+
+### list quotations for ALAB
+GET http://127.0.0.1:8000/quotations?company_code=ALAB
