@@ -5,11 +5,12 @@ from typing import Optional, Literal, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from app.db import get_db
-from app.models import Company, Inquiry
+from app.models import Company, Inquiry, Quotation, QuotationItem, AuditLog
 from fastapi import Body
 from app.services.parser.factory import get_parser
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Literal
+from app.schemas import QuotationRead
 
 router = APIRouter(prefix="/inquiries", tags=["inquiries"])
 
@@ -150,3 +151,84 @@ async def ingest_inquiry(payload: IngestRequest, db: AsyncSession = Depends(get_
         received_at=row.received_at.isoformat(),
         extraction_json=row.extraction_json,
     )
+
+@router.post("/{inquiry_id}/to-quotation", response_model=QuotationRead)
+async def inquiry_to_quotation(inquiry_id: str, db: AsyncSession = Depends(get_db)):
+    # load inquiry
+    res = await db.execute(select(Inquiry).where(Inquiry.id == inquiry_id))
+    inq = res.scalar_one_or_none()
+    if not inq:
+        raise HTTPException(status_code=404, detail="inquiry not found")
+
+    # resolve company (prefer FK if present)
+    company = None
+    if getattr(inq, "company_id", None):
+        company = await db.get(Company, inq.company_id)
+    elif getattr(inq, "company_code", None):
+        res_c = await db.execute(select(Company).where(Company.code == inq.company_code))
+        company = res_c.scalar_one_or_none()
+
+    if not company:
+        raise HTTPException(status_code=400, detail="company for inquiry not found")
+
+    # helper for quote numbers
+    from sqlalchemy import func
+    async def _next_quote_no(db: AsyncSession, company_code: str) -> str:
+        prefix = f"{company_code}-Q-"
+        r = await db.execute(
+            select(func.max(Quotation.quote_no)).where(Quotation.quote_no.like(f"{prefix}%"))
+        )
+        last = r.scalar_one_or_none()
+        if last:
+            import re
+            m = re.search(r"(\d+)$", last)
+            n = int(m.group(1)) + 1 if m else 1
+        else:
+            n = 1
+        return f"{prefix}{n:04d}"
+
+    # build first item from extraction_json (fallbacks are safe)
+    desc = inq.raw_subject or ""
+    qty, uom = 1.0, "EA"
+    if inq.extraction_json:
+        j = inq.extraction_json or {}
+        desc = j.get("product_snippet") or j.get("product") or desc or (inq.raw_body[:120] if inq.raw_body else "Line 1")
+        try:
+            qty = float(j.get("qty") or qty)
+        except Exception:
+            pass
+        uom = (j.get("unit") or j.get("uom") or uom)
+
+    quote = Quotation(
+        inquiry_id=inq.id,  
+        company_id=company.id,
+        currency="INR",
+        status="draft",
+        notes=f"Auto-created from inquiry {inq.id}",
+    )
+    quote.quote_no = await _next_quote_no(db, company.code)
+
+    quote.items = [
+        QuotationItem(
+            description=desc or "Line 1",
+            qty=qty,
+            uom=uom,
+            unit_price=0,
+            line_total=0,
+        )
+    ]
+
+    db.add(quote)
+    db.add(AuditLog(
+        company_id=company.id,
+        entity="quotation",
+        entity_id="(pending)",
+        action="create_from_inquiry",
+        before_json={"inquiry_id": inq.id},
+        after_json={"quote_no": quote.quote_no},
+    ))
+
+    await db.commit()
+    # ensure items are loaded; prevents async lazy-load after commit
+    await db.refresh(quote, attribute_names=["items"])
+    return quote

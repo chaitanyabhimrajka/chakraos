@@ -1,0 +1,27 @@
+### Health
+GET https://chakraos-api-656857229129.asia-south1.run.app/health
+
+### Ingest (runs parser → fills extraction_json)
+POST https://chakraos-api-656857229129.asia-south1.run.app/inquiries/ingest
+Content-Type: application/json
+
+{
+  "company_code": "ALAB",
+  "source": "email",
+  "from_email": "buyer@amitlabs.com",
+  "text": "Please quote 500 L benzene technical grade delivered Jaipur by Friday."
+}
+
+### List (should show extraction_json for the above)
+GET https://chakraos-api-656857229129.asia-south1.run.app/inquiries?company_code=ALAB
+
+### (Optional) Structured create (does NOT run parser; extraction_json will be null)
+POST https://chakraos-api-656857229129.asia-south1.run.app/inquiries
+Content-Type: application/json
+
+{
+  "company_code": "ALAB",
+  "source": "email",
+  "raw_body": "Manual: need 10 kg benzene tech grade",
+  "from_email": "ops@amitlabs.com"
+}
